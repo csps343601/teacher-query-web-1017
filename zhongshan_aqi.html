@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>臺北市中山站 空氣品質儀表板</title>
+    <style>
+        /* 讓頁面看起來像一個單純的監測範圍 */
+        body { 
+            font-family: 'Arial', sans-serif; 
+            text-align: center; 
+            padding: 0; /* 移除外邊距 */
+            margin: 0;
+            background-color: #f0f8ff; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* 確保內容至少佔滿整個視窗高度 */
+        }
+        .data-card {
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 450px; /* 限制儀表板大小 */
+            padding: 30px;
+            box-sizing: border-box;
+            border: 3px solid #0056b3;
+        }
+        h1 { 
+            color: #0056b3; 
+            font-size: 1.5em;
+            margin-bottom: 5px;
+        }
+        .source {
+            font-size: 0.8em;
+            color: #888;
+            margin-bottom: 20px;
+        }
+        .label { color: #555; font-size: 1.1em; margin-top: 20px; }
+        .aqi-value, .pm25-value { 
+            font-size: 3.5em; 
+            font-weight: 900; 
+            margin: 5px 0 10px; 
+            transition: color 0.5s;
+        }
+        .time { margin-top: 15px; font-size: 0.8em; color: #aaa; }
+    </style>
+</head>
+<body>
+    <div class="data-card">
+        <h1>臺北市中山站</h1>
+        <div class="source">即時空氣品質（環境部資料）</div>
+        
+        <div class="label">空氣品質指標 (AQI):</div>
+        <div id="aqi-display" class="aqi-value">...</div>
+        
+        <div class="label">細懸浮微粒 (PM2.5):</div>
+        <div id="pm25-display" class="pm25-value">...</div>
+
+        <div id="update-time" class="time"></div>
+    </div>
+
+    <script>
+        // *** 重要：請替換成最新的環境部資料開放 JSON 連結！ ***
+        // 以下範例使用官方開放資料平台的一般連結格式，需替換為您的 API Key。
+        const DATA_URL = 'https://data.moenv.gov.tw/api/v2/aqx_p_432?api_key=15efe242-f6cc-491b-a45c-0fbb3a884e0b&limit=1000&sort=ImportDate%20desc&offset=0&format=json';
+        const STATION_NAME = '中山';
+
+        function updateColor(value, elementId) {
+            const el = document.getElementById(elementId);
+            const num = parseInt(value);
+            let color = '#ccc';
+            if (elementId.includes('aqi')) {
+                // AQI 顏色標準
+                if (num <= 50) color = '#00e400'; // 良好
+                else if (num <= 100) color = '#ffff00'; // 普通
+                else if (num <= 150) color = '#ff7e00'; // 對敏感族群不健康
+                else if (num <= 200) color = '#ff0000'; // 對所有族群不健康
+                else if (num <= 300) color = '#99004c'; // 非常不健康
+                else color = '#7e0023'; // 危害
+            } else if (elementId.includes('pm25')) {
+                 // PM2.5 顏色標準 (參考台灣標準)
+                if (num <= 15) color = '#00e400';
+                else if (num <= 35) color = '#ffff00';
+                else if (num <= 53) color = '#ff7e00';
+                else color = '#ff0000';
+            }
+            el.style.color = color;
+        }
+
+        async function fetchAirQualityData() {
+            document.getElementById('aqi-display').textContent = '載入中...';
+            document.getElementById('pm25-display').textContent = '載入中...';
+
+            try {
+                // 為了避免瀏覽器 CORS 問題，您可能需要透過自己的後端服務來代理這個 API 呼叫。
+                const response = await fetch(DATA_URL); 
+                const data = await response.json();
+                
+                const zhongshanData = data.records.find(item => item.sitename === STATION_NAME);
+
+                if (zhongshanData) {
+                    const aqi = zhongshanData.aqi || 'N/A';
+                    const pm25 = zhongshanData['pm2.5'] || 'N/A';
+
+                    document.getElementById('aqi-display').textContent = aqi;
+                    document.getElementById('pm25-display').textContent = `${pm25} μg/m³`;
+                    document.getElementById('update-time').textContent = `更新時間: ${zhongshanData.publishtime}`;
+                    
+                    updateColor(aqi, 'aqi-display');
+                    updateColor(pm25, 'pm25-display');
+
+                } else {
+                    document.getElementById('aqi-display').textContent = '資料N/A';
+                    document.getElementById('pm25-display').textContent = '資料N/A';
+                }
+
+            } catch (error) {
+                console.error('獲取空氣品質資料時發生錯誤:', error);
+                document.getElementById('aqi-display').textContent = '連線失敗';
+                document.getElementById('pm25-display').textContent = '連線失敗';
+            }
+        }
+
+        // 載入頁面時執行
+        fetchAirQualityData();
+        // 每 30 分鐘更新一次
+        setInterval(fetchAirQualityData, 30 * 60 * 1000); 
+
+    </script>
+</body>
+</html>
